@@ -1,46 +1,89 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"unicode"
-	// bencode "github.com/jackpal/bencode-go" // Available if you need it!
 )
 
-// Example:
-// - 5:hello -> hello
-// - 10:hello12345 -> hello12345
-func decodeBencode(bencodedString string) (interface{}, error) {
-	if unicode.IsDigit(rune(bencodedString[0])) {
-		var firstColonIndex int
+var (
+	ErrUnsupportedType = errors.New("unsupported bencode type")
+	ErrMalformedString = errors.New("malformed string")
+)
 
-		for i := 0; i < len(bencodedString); i++ {
-			if bencodedString[i] == ':' {
-				firstColonIndex = i
+type bencodeDecoder struct {
+	*bufio.Reader
+}
+
+func (b *bencodeDecoder) decode() (interface{}, error) {
+	first, err := b.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	switch {
+	case unicode.IsDigit(rune(first)):
+		lenStr, err := b.ReadString(':')
+		if err != nil {
+			return nil, err
+		}
+
+		lenStr = string(first) + lenStr[:len(lenStr)-1]
+		// fmt.Println("len: ", lenStr)
+
+		length, err := strconv.Atoi(lenStr)
+		if err != nil {
+			return nil, fmt.Errorf("can't decode length: %w", err)
+		}
+
+		s := make([]byte, length)
+		read, err := b.Read(s)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+
+		if read != length {
+			return nil, ErrMalformedString
+		}
+
+		return string(s), nil
+
+	case first == 'i':
+		str, err := b.ReadString('e')
+		if err != nil {
+			return nil, err
+		}
+
+		return strconv.Atoi(str[:len(str)-1]) // exclude 'e'
+
+	case first == 'l':
+		result := []interface{}{}
+		for {
+			item, err := b.decode()
+			if err != nil {
+				return nil, err
+			}
+
+			if item == nil {
 				break
 			}
+
+			result = append(result, item)
 		}
 
-		lengthStr := bencodedString[:firstColonIndex]
+		return result, nil
 
-		length, err := strconv.Atoi(lengthStr)
-		if err != nil {
-			return "", err
-		}
+	case first == 'e':
+		return nil, nil
 
-		return bencodedString[firstColonIndex+1 : firstColonIndex+1+length], nil
-	} else if bencodedString[0] == 'i' {
-		if len(bencodedString) < 3 { // string must contain at least i<number>e
-			return nil, fmt.Errorf("invalid encoded integer given: %s", bencodedString)
-		}
-
-		str := bencodedString[1 : len(bencodedString)-1]
-
-		return strconv.Atoi(str)
-	} else {
-		return "", fmt.Errorf("Only strings and integers are supported at the moment")
+	default:
+		return nil, ErrUnsupportedType
 	}
 }
 
@@ -49,8 +92,11 @@ func main() {
 
 	if command == "decode" {
 		bencodedValue := os.Args[2]
+		// fmt.Println("bencoded value: ", bencodedValue)
+		buf := bytes.NewBuffer([]byte(bencodedValue))
+		bd := bencodeDecoder{bufio.NewReader(buf)}
 
-		decoded, err := decodeBencode(bencodedValue)
+		decoded, err := bd.decode()
 		if err != nil {
 			fmt.Println(err)
 			return
