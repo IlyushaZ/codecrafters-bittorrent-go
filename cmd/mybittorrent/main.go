@@ -3,11 +3,13 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -77,6 +79,45 @@ func main() {
 		fmt.Printf("Info Hash: %x", sum)
 		fmt.Print("Piece Length: ", infoMap["piece length"])
 		fmt.Printf("Piece Hashes: %x", infoMap["pieces"])
+
+	case "peers":
+		f, err := os.Open(os.Args[2])
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		// decode .torrent file
+		bd := bdecoder{bufio.NewReader(f)}
+
+		decoded, err := bd.decode()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		decodedMap, ok := decoded.(map[string]interface{})
+		if !ok {
+			fmt.Printf("expected decoded value to be map, got %T\n", decoded)
+			return
+		}
+
+		// get info section
+		info := decodedMap["info"]
+		infoMap, ok := info.(map[string]interface{})
+		if !ok {
+			fmt.Printf("expected info to be map, got %T\n", decoded)
+			return
+		}
+
+		peers, err := ListPeers(context.Background(), decodedMap["announce"].(string), infoMap)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		fmt.Print(strings.Join(peers, ""))
+
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
