@@ -35,7 +35,6 @@ func (b *bencodeDecoder) decode() (interface{}, error) {
 		}
 
 		lenStr = string(first) + lenStr[:len(lenStr)-1]
-		// fmt.Println("len: ", lenStr)
 
 		length, err := strconv.Atoi(lenStr)
 		if err != nil {
@@ -79,6 +78,37 @@ func (b *bencodeDecoder) decode() (interface{}, error) {
 
 		return result, nil
 
+	case first == 'd':
+		result := make(map[string]interface{})
+		for {
+			key, err := b.decode()
+			if err != nil {
+				return nil, err
+			}
+
+			if key == nil {
+				break
+			}
+
+			strKey, ok := key.(string)
+			if !ok {
+				return nil, errors.New("dictionary's key must always be string")
+			}
+
+			val, err := b.decode()
+			if err != nil {
+				return nil, err
+			}
+
+			if val == nil {
+				break
+			}
+
+			result[strKey] = val
+		}
+
+		return result, nil
+
 	case first == 'e':
 		return nil, nil
 
@@ -92,7 +122,6 @@ func main() {
 
 	if command == "decode" {
 		bencodedValue := os.Args[2]
-		// fmt.Println("bencoded value: ", bencodedValue)
 		buf := bytes.NewBuffer([]byte(bencodedValue))
 		bd := bencodeDecoder{bufio.NewReader(buf)}
 
