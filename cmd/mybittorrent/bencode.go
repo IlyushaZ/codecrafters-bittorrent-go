@@ -117,7 +117,6 @@ func (b *bdecoder) decode() (interface{}, error) {
 }
 
 type bencoder struct {
-	// *bufio.Writer
 	*bytes.Buffer
 }
 

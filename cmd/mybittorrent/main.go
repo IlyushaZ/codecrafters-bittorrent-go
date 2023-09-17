@@ -35,6 +35,7 @@ func main() {
 			return
 		}
 
+		// decode .torrent file
 		bd := bdecoder{bufio.NewReader(f)}
 
 		decoded, err := bd.decode()
@@ -49,6 +50,7 @@ func main() {
 			return
 		}
 
+		// get info section
 		info := decodedMap["info"]
 		infoMap, ok := info.(map[string]interface{})
 		if !ok {
@@ -56,6 +58,7 @@ func main() {
 			return
 		}
 
+		// calculate hash from info section
 		buf := bytes.Buffer{}
 		be := bencoder{&buf}
 		err = be.encode(infoMap)
@@ -72,6 +75,8 @@ func main() {
 		fmt.Print("Tracker URL: ", decodedMap["announce"])
 		fmt.Print("Length: ", infoMap["length"])
 		fmt.Printf("Info Hash: %x", sum)
+		fmt.Print("Piece Length: ", infoMap["piece length"])
+		fmt.Printf("Piece Hashes: %x", infoMap["pieces"])
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
