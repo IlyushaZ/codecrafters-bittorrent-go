@@ -3,8 +3,10 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -14,9 +16,9 @@ func main() {
 	switch command {
 	case "decode":
 		bencodedValue := os.Args[2]
-		buf := bytes.NewBuffer([]byte(bencodedValue))
-		bd := bencodeDecoder{bufio.NewReader(buf)}
 
+		buf := bytes.NewBuffer([]byte(bencodedValue))
+		bd := bdecoder{bufio.NewReader(buf)}
 		decoded, err := bd.decode()
 		if err != nil {
 			fmt.Println(err)
@@ -33,7 +35,7 @@ func main() {
 			return
 		}
 
-		bd := bencodeDecoder{bufio.NewReader(f)}
+		bd := bdecoder{bufio.NewReader(f)}
 
 		decoded, err := bd.decode()
 		if err != nil {
@@ -54,8 +56,22 @@ func main() {
 			return
 		}
 
+		buf := bytes.Buffer{}
+		be := bencoder{&buf}
+		err = be.encode(infoMap)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		h := sha1.New()
+		io.Copy(h, &buf)
+
+		sum := h.Sum(nil)
+
 		fmt.Print("Tracker URL: ", decodedMap["announce"])
 		fmt.Print("Length: ", infoMap["length"])
+		fmt.Printf("Info Hash: %x", sum)
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)

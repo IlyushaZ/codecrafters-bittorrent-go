@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"unicode"
 )
@@ -14,11 +16,11 @@ var (
 	ErrMalformedString = errors.New("malformed string")
 )
 
-type bencodeDecoder struct {
+type bdecoder struct {
 	*bufio.Reader
 }
 
-func (b *bencodeDecoder) decode() (interface{}, error) {
+func (b *bdecoder) decode() (interface{}, error) {
 	first, err := b.ReadByte()
 	if err != nil {
 		return nil, err
@@ -111,5 +113,49 @@ func (b *bencodeDecoder) decode() (interface{}, error) {
 
 	default:
 		return nil, ErrUnsupportedType
+	}
+}
+
+type bencoder struct {
+	// *bufio.Writer
+	*bytes.Buffer
+}
+
+func (b *bencoder) encode(val interface{}) error {
+	switch v := val.(type) {
+	case string:
+		b.WriteString(fmt.Sprintf("%d:%s", len(v), v))
+		return nil
+	case int:
+		b.WriteString(fmt.Sprintf("i%de", v))
+		return nil
+	case []interface{}:
+		b.WriteByte('l')
+		for _, item := range v {
+			b.encode(item)
+		}
+		b.WriteByte('e')
+
+		return nil
+	case map[string]interface{}:
+		keys := make([]string, 0, len(v))
+		for k := range v {
+			keys = append(keys, k)
+		}
+
+		sort.Strings(keys)
+
+		b.WriteByte('d')
+
+		for _, k := range keys {
+			b.encode(k)
+			b.encode(v[k])
+		}
+
+		b.WriteByte('e')
+
+		return nil
+	default:
+		return ErrUnsupportedType
 	}
 }
