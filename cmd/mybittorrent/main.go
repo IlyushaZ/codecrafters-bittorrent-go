@@ -31,8 +31,16 @@ func decodeBencode(bencodedString string) (interface{}, error) {
 		}
 
 		return bencodedString[firstColonIndex+1 : firstColonIndex+1+length], nil
+	} else if bencodedString[0] == 'i' {
+		if len(bencodedString) < 3 { // string must contain at least i<number>e
+			return nil, fmt.Errorf("invalid encoded integer given: %s", bencodedString)
+		}
+
+		str := bencodedString[1 : len(bencodedString)-1]
+
+		return strconv.Atoi(str)
 	} else {
-		return "", fmt.Errorf("Only strings are supported at the moment")
+		return "", fmt.Errorf("Only strings and integers are supported at the moment")
 	}
 }
 
